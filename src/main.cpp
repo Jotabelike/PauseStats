@@ -13,6 +13,18 @@ void loadCompletions(const std::string& key, int& completions) {
 void saveCompletions(const std::string& key, int completions) {
     Mod::get()->setSavedValue<int>("level_completions_" + key, completions);
 }
+std::string findDevice() {
+    std::string device = "PC";
+    #ifdef GEODE_IS_MACOS
+    device = "macOS";
+    #endif
+    switch (CCApplication::sharedApplication()->getTargetPlatform()) {
+        case kTargetIphone: return "iOS";
+        case kTargetIpad: return "iPadOS";
+        case kTargetAndroid: return "Android";
+        default: return device;
+    }
+}
 float getStatsX() { return Mod::get()->getSettingValue<float>("stats_x"); }
 float getStatsY() { return Mod::get()->getSettingValue<float>("stats_y"); }
 
@@ -161,13 +173,7 @@ class $modify(PauseLayerHook, PauseLayer) {
             y -= deltaY * statsScale;
         }
         if (showDevice) {
-            std::string device = "PC";
-            switch (CCApplication::sharedApplication()->getTargetPlatform()) {
-            case kTargetIphone:
-            case kTargetIpad:
-            case kTargetAndroid: device = "Mobile"; break;
-            default: device = "PC";
-            }
+            std::string device = findDevice();
             auto lbl = CCLabelBMFont::create("DEVICE", "goldFont.fnt");
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
