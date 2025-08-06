@@ -8,7 +8,7 @@
 	},
 	"id": "jotabelike.pausestats",
 	"name": "Pause Stats",
-	"version": "v1.1.5",
+	"version": "v1.2.5",
 	"developer": "XJotabelikeX",
 	"description": "More stats in pause menu. Ahora muestra cuántos checkpoints tiene el nivel en modo plataforma.",
 	"tags": [

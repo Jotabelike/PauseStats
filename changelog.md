@@ -23,7 +23,7 @@
 ---
 
 
-## v1.1.5
+## v1.2.5
 - Horizontal option
 - all checkpoints in platform mode
 - The counting when completing a level in normal mode was separated from the practice mode
