@@ -8,9 +8,14 @@
 	},
 	"id": "jotabelike.pausestats",
 	"name": "Pause Stats",
-	"version": "v1.1.0",
+	"version": "v1.1.5",
 	"developer": "XJotabelikeX",
-	"description": "More stats in pause menu",
+	"description": "More stats in pause menu. Ahora muestra cuántos checkpoints tiene el nivel en modo plataforma.",
+	"tags": [
+		"interface",
+		"utility",
+		"offline"
+	],
 	"settings": {
 		"show_attempts": {
 			"type": "bool",
@@ -19,7 +24,7 @@
 		},
 		"stats_x": {
 			"type": "float",
-			"default": 40.0,
+			"default": 42.0,
 			"min": 0.0,
 			"max": 800.0,
 			"name": "X Position",
@@ -27,7 +32,7 @@
 		},
 		"stats_y": {
 			"type": "float",
-			"default": 243.0,
+			"default": 290.0,
 			"min": 0.0,
 			"max": 600.0,
 			"name": "Y Position",
@@ -35,11 +40,16 @@
 		},
 		"stats_spacing": {
 			"type": "float",
-			"default": 35.0,
+			"default": 31.0,
 			"min": 10.0,
 			"max": 80.0,
 			"name": "Stats Spacing",
 			"control": { "slider": true }
+		},
+		"stats_horizontal": {
+			"type": "bool",
+			"default": false,
+			"name": "Horizontal Layout"
 		},
 		"show_jumps": {
 			"type": "bool",
@@ -54,7 +64,14 @@
 		"show_object_count": {
 			"type": "bool",
 			"default": true,
-			"name": "Show Object Count"
+			"name": "Show Object Count",
+			"info": "El conteo de objetos puede ser inexacto en niveles muy grandes o complejos."
+		},
+		"show_checkpoints": {
+			"type": "bool",
+			"default": true,
+			"name": "Show Checkpoints",
+			"info": "Muestra cuántos checkpoints tiene el nivel (solo en modo plataforma)."
 		},
 		"show_level_id": {
 			"type": "bool",
@@ -86,7 +103,7 @@
 		},
 		"stats_scale": {
 			"type": "float",
-			"default": 1.0,
+			"default": 0.7,
 			"min": 0.5,
 			"max": 2.0,
 			"name": "Stats Size",

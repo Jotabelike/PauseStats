@@ -4,36 +4,86 @@
 #include <Geode/utils/cocos.hpp>
 using namespace geode::prelude;
 
-// Ahora el espaciado es configurable por setting
+// Espaciado configurable y soporte horizontal
 float getDeltaY() { return Mod::get()->getSettingValue<float>("stats_spacing"); }
+bool isHorizontal() { return Mod::get()->getSettingValue<bool>("stats_horizontal"); }
 
 void loadCompletions(const std::string& key, int& completions) {
-    completions = Mod::get()->getSavedValue<int>("level_completions_" + key, 0);
+    completions = Mod::get()->getSavedValue<int>(key, 0);
 }
 void saveCompletions(const std::string& key, int completions) {
-    Mod::get()->setSavedValue<int>("level_completions_" + key, completions);
+    Mod::get()->setSavedValue<int>(key, completions);
 }
 float getStatsX() { return Mod::get()->getSettingValue<float>("stats_x"); }
 float getStatsY() { return Mod::get()->getSettingValue<float>("stats_y"); }
 
+int getObjectCount(GJGameLevel* level, PlayLayer* playLayer) {
+    if (playLayer && playLayer->m_objects && playLayer->m_objects->count() > 0)
+        return playLayer->m_objects->count();
+    if (level) return level->m_objectCount;
+    return 0;
+}
+
+// Cuenta checkpoints de plataforma (objeto ID 2063) en el nivel
+int getPlatformerCheckpointCount(PlayLayer* playLayer) {
+    if (!playLayer || !playLayer->m_objects) return 0;
+    int count = 0;
+    auto arr = CCArrayExt<GameObject*>(playLayer->m_objects);
+    for (auto obj : arr) {
+        if (obj && obj->m_objectID == 2063) { // 2063 = Platformer Checkpoint (GD 2.2064+)
+            count++;
+        }
+    }
+    return count;
+}
+
+// Detecta el dispositivo y lo muestra como PC, Android o iOS
+std::string getDeviceString() {
+    switch (CCApplication::sharedApplication()->getTargetPlatform()) {
+    case kTargetIphone:
+    case kTargetIpad:
+        return "iOS";
+    case kTargetAndroid:
+        return "Android";
+    default:
+        return "PC";
+    }
+}
+
 class $modify(PlayLayerHook, PlayLayer) {
-    struct Fields { bool completed = false; };
+    struct Fields { bool completedNormal = false; bool completedPractice = false; };
 
     void resetLevel() {
-        m_fields->completed = false;
+        m_fields->completedNormal = false;
+        m_fields->completedPractice = false;
         PlayLayer::resetLevel();
+    }
+
+    void update(float dt) {
+        PlayLayer::update(dt);
     }
 
     void levelComplete() {
         PlayLayer::levelComplete();
-        if (!m_fields->completed) {
-            m_fields->completed = true;
-            auto level = m_level;
-            if (level) {
-                std::string levelKey = fmt::format("{}", level->m_levelID.value());
-                int completions = Mod::get()->getSavedValue<int>("level_completions_" + levelKey, 0);
+        auto level = m_level;
+        if (!level) return;
+        std::string baseKey = fmt::format("level_completions_{}", level->m_levelID.value());
+        if (m_isPracticeMode) {
+            if (!m_fields->completedPractice) {
+                m_fields->completedPractice = true;
+                std::string practiceKey = baseKey + "_practice";
+                int completions = Mod::get()->getSavedValue<int>(practiceKey, 0);
                 completions++;
-                Mod::get()->setSavedValue<int>("level_completions_" + levelKey, completions);
+                Mod::get()->setSavedValue<int>(practiceKey, completions);
+            }
+        }
+        else {
+            if (!m_fields->completedNormal) {
+                m_fields->completedNormal = true;
+                std::string normalKey = baseKey + "_normal";
+                int completions = Mod::get()->getSavedValue<int>(normalKey, 0);
+                completions++;
+                Mod::get()->setSavedValue<int>(normalKey, completions);
             }
         }
     }
@@ -59,6 +109,7 @@ class $modify(PauseLayerHook, PauseLayer) {
         float statsX = getStatsX();
         float statsY = getStatsY();
         float deltaY = getDeltaY();
+        bool horizontal = isHorizontal();
 
         bool showAttempts = Mod::get()->getSettingValue<bool>("show_attempts");
         bool showJumps = Mod::get()->getSettingValue<bool>("show_jumps");
@@ -68,9 +119,9 @@ class $modify(PauseLayerHook, PauseLayer) {
         bool showGamemode = Mod::get()->getSettingValue<bool>("show_gamemode");
         bool showLevelID = Mod::get()->getSettingValue<bool>("show_level_id");
         bool showSongID = Mod::get()->getSettingValue<bool>("show_song_id");
+        bool showCheckpoints = Mod::get()->getSettingValue<bool>("show_checkpoints");
 
-        float y = statsY;
-
+        // Limpiar stats anteriores
         for (auto lbl : m_fields->statLabels) if (lbl) lbl->removeFromParent();
         for (auto lbl : m_fields->statValues) if (lbl) lbl->removeFromParent();
         for (auto lbl : m_fields->idValuesLabels) if (lbl) lbl->removeFromParent();
@@ -78,13 +129,27 @@ class $modify(PauseLayerHook, PauseLayer) {
         m_fields->statValues.clear();
         m_fields->idValuesLabels.clear();
 
+        // Layout inicial
+        float y = statsY;
+        float x = statsX;
+        int statIndex = 0;
+
+        auto nextPos = [&](int index) {
+            if (horizontal) {
+                return CCPoint{ x + index * deltaY * statsScale, y };
+            }
+            else {
+                return CCPoint{ x, y - index * deltaY * statsScale };
+            }
+            };
+
         if (showAttempts) {
             int totalAttempts = level->m_attempts;
             auto lbl = CCLabelBMFont::create("Attempts", "goldFont.fnt");
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -92,11 +157,13 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showJumps) {
             int totalJumps = level->m_jumps;
@@ -104,7 +171,7 @@ class $modify(PauseLayerHook, PauseLayer) {
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -112,41 +179,50 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showCompletions) {
-            std::string levelKey = fmt::format("{}", level->m_levelID.value());
-            int completions = 0; loadCompletions(levelKey, completions);
+            std::string baseKey = fmt::format("level_completions_{}", level->m_levelID.value());
+            std::string normalKey = baseKey + "_normal";
+            std::string practiceKey = baseKey + "_practice";
+            int normal = 0, practice = 0;
+            loadCompletions(normalKey, normal);
+            loadCompletions(practiceKey, practice);
 
             auto lbl = CCLabelBMFont::create("Completed", "goldFont.fnt");
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
-            auto val = CCLabelBMFont::create(fmt::format("{}", completions).c_str(), "bigFont.fnt");
+            auto val = CCLabelBMFont::create(fmt::format("{} | P:{}", normal, practice).c_str(), "bigFont.fnt");
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showObjectCount) {
-            int objectCount = level->m_objectCount;
+            int objectCount = getObjectCount(level, playLayer);
+
             auto lbl = CCLabelBMFont::create("All Objs", "goldFont.fnt");
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -154,25 +230,48 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
+        }
+        if (showCheckpoints) {
+            std::string label = "Checkpoints";
+            std::string value = "NA";
+            if (playLayer->m_isPlatformer) {
+                int checkpointCount = getPlatformerCheckpointCount(playLayer);
+                value = fmt::format("{}", checkpointCount);
+            }
+            auto lbl = CCLabelBMFont::create(label.c_str(), "goldFont.fnt");
+            lbl->setScale(0.33f * statsScale);
+            lbl->setColor({ 200,200,200 });
+            lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
+            lbl->setPosition(nextPos(statIndex));
+            addChild(lbl, 100);
+            m_fields->statLabels.push_back(lbl);
+
+            auto val = CCLabelBMFont::create(value.c_str(), "bigFont.fnt");
+            val->setScale(0.44f * statsScale);
+            val->setColor({ 255,255,255 });
+            val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
+            addChild(val, 100);
+            m_fields->statValues.push_back(val);
+
+            ++statIndex;
         }
         if (showDevice) {
-            std::string device = "PC";
-            switch (CCApplication::sharedApplication()->getTargetPlatform()) {
-            case kTargetIphone:
-            case kTargetIpad:
-            case kTargetAndroid: device = "Mobile"; break;
-            default: device = "PC";
-            }
+            std::string device = getDeviceString();
             auto lbl = CCLabelBMFont::create("DEVICE", "goldFont.fnt");
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -180,11 +279,13 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showGamemode) {
             std::string gamemode = playLayer->m_isPlatformer ? "Plat" : "Classic";
@@ -192,7 +293,7 @@ class $modify(PauseLayerHook, PauseLayer) {
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -200,11 +301,13 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 255,255,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->statValues.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showLevelID) {
             std::string levelID = fmt::format("{}", level->m_levelID.value());
@@ -212,7 +315,7 @@ class $modify(PauseLayerHook, PauseLayer) {
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -220,11 +323,13 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 100,220,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->idValuesLabels.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
         if (showSongID) {
             std::string songID = level->m_songID ? fmt::format("{}", level->m_songID) : "0";
@@ -232,7 +337,7 @@ class $modify(PauseLayerHook, PauseLayer) {
             lbl->setScale(0.33f * statsScale);
             lbl->setColor({ 200,200,200 });
             lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            lbl->setPosition({ statsX, y });
+            lbl->setPosition(nextPos(statIndex));
             addChild(lbl, 100);
             m_fields->statLabels.push_back(lbl);
 
@@ -240,29 +345,49 @@ class $modify(PauseLayerHook, PauseLayer) {
             val->setScale(0.44f * statsScale);
             val->setColor({ 100,220,255 });
             val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-            val->setPosition({ statsX, y - 13.0f * statsScale });
+            auto valuePos = nextPos(statIndex);
+            valuePos.y -= 13.0f * statsScale;
+            val->setPosition(valuePos);
             addChild(val, 100);
             m_fields->idValuesLabels.push_back(val);
 
-            y -= deltaY * statsScale;
+            ++statIndex;
         }
     }
 
     void moveStatsTo(float newX, float newY) {
         float statsScale = Mod::get()->getSettingValue<float>("stats_scale");
         float deltaY = getDeltaY();
-        float y = newY;
-        size_t statIdx = 0, valueIdx = 0, idIdx = 0;
-        for (; statIdx < m_fields->statLabels.size(); ++statIdx) {
-            if (m_fields->statLabels[statIdx])
-                m_fields->statLabels[statIdx]->setPosition({ newX, y });
-            if (valueIdx < m_fields->statValues.size() && m_fields->statValues[valueIdx])
-                m_fields->statValues[valueIdx++]->setPosition({ newX, y - 13.0f * statsScale });
-            y -= deltaY * statsScale;
+        bool horizontal = isHorizontal();
+        float x = newX, y = newY;
+        int statIndex = 0, valueIndex = 0;
+
+        auto nextPos = [&](int index) {
+            if (horizontal) {
+                return CCPoint{ x + index * deltaY * statsScale, y };
+            }
+            else {
+                return CCPoint{ x, y - index * deltaY * statsScale };
+            }
+            };
+
+        for (; statIndex < m_fields->statLabels.size(); ++statIndex) {
+            if (m_fields->statLabels[statIndex])
+                m_fields->statLabels[statIndex]->setPosition(nextPos(statIndex));
+            if (valueIndex < m_fields->statValues.size() && m_fields->statValues[valueIndex]) {
+                auto valuePos = nextPos(statIndex);
+                valuePos.y -= 13.0f * statsScale;
+                m_fields->statValues[valueIndex++]->setPosition(valuePos);
+            }
         }
+        int idIndex = 0;
         for (auto lbl : m_fields->idValuesLabels) {
-            if (lbl) lbl->setPosition({ newX, y - 13.0f * statsScale });
-            y -= deltaY * statsScale;
+            if (lbl) {
+                auto valuePos = nextPos(statIndex + idIndex);
+                valuePos.y -= 13.0f * statsScale;
+                lbl->setPosition(valuePos);
+                idIndex++;
+            }
         }
     }
 };

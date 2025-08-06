@@ -12,12 +12,22 @@
 ## v1.0.7 – cross-platform settings
 - Supports all devices
 
+
 ## v1.1.0 – Custom position & More Options
 - Add Song ID
 - Add Level ID
 - Position Y customizable
 - Position X customizable
 - Improved and custom spacing
+
+---
+
+
+## v1.1.5
+- Horizontal option
+- all checkpoints in platform mode
+- The counting when completing a level in normal mode was separated from the practice mode
+-"IOs" was added to the device name
 
 ---
 
