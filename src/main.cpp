@@ -41,12 +41,19 @@ int getPlatformerCheckpointCount(PlayLayer* playLayer) {
 std::string getDeviceString() {
     switch (CCApplication::sharedApplication()->getTargetPlatform()) {
     case kTargetIphone:
+        return "iOS"
     case kTargetIpad:
-        return "iOS";
+        return "iPadOS";
     case kTargetAndroid:
         return "Android";
+    case kTargetMacOS:
+        #ifdef GEODE_IS_ARM_MAC
+        return "macOS (ARM)";
+        #else
+        return "macOS (Intel)";
+        #endif
     default:
-        return "PC";
+        return "Windows";
     }
 }
 
