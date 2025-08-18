@@ -41,7 +41,7 @@ int getPlatformerCheckpointCount(PlayLayer* playLayer) {
 std::string getDeviceString() {
     switch (CCApplication::sharedApplication()->getTargetPlatform()) {
     case kTargetIphone:
-        return "iOS"
+        return "iOS";
     case kTargetIpad:
         return "iPadOS";
     case kTargetAndroid:
