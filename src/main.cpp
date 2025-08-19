@@ -1,4 +1,5 @@
-﻿#include <Geode/Geode.hpp>
+﻿#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <Geode/Geode.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/cocos.hpp>
@@ -68,6 +69,7 @@ class $modify(PlayLayerHook, PlayLayer) {
         auto level = m_level;
         if (!level) return;
         std::string baseKey = fmt::format("level_completions_{}", level->m_levelID.value());
+        if (level->m_levelType == GJLevelType::Editor) baseKey = fmt::format("{}_editor_{}", baseKey, EditorIDs::getID(level));
         if (m_isPracticeMode) {
             if (!m_fields->completedPractice) {
                 m_fields->completedPractice = true;
