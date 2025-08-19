@@ -16,6 +16,9 @@
 		"utility",
 		"offline"
 	],
+	"dependencies": {
+		"cvolton.level-id-api": ">=v1.0.1"
+	},
 	"settings": {
 		"show_attempts": {
 			"type": "bool",
