@@ -1,5 +1,5 @@
 # Pause Stats
-## v1.3.0 Copy information
+## v1.3.4 Copy information
 - The option was added to copy the information of each information individually
 - Next Key
 

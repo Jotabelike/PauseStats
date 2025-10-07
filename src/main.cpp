@@ -1,7 +1,7 @@
 ﻿#include <Geode/Geode.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/ui/Notification.hpp> // Para la notificación "Copiado"
+#include <Geode/ui/Notification.hpp> 
 #include <Geode/utils/cocos.hpp>
 #include <functional>
 #include <algorithm>
@@ -206,6 +206,7 @@ class $modify(PauseLayerHook, PauseLayer) {
         bool showSongID = Mod::get()->getSettingValue<bool>("show_song_id");
         bool showCheckpoints = Mod::get()->getSettingValue<bool>("show_checkpoints");
         bool showNextKey = Mod::get()->getSettingValue<bool>("show_next_key"); 
+
         float y = statsY;
         float x = statsX;
         int statIndex = 0;
@@ -275,11 +276,11 @@ class $modify(PauseLayerHook, PauseLayer) {
             }
             addStat("Checkpoints", value, value);
         }
-        // ---NUEVO--- Añadir la estadística "Next Key"
+        
         if (showNextKey) {
             auto orbs = calculateOrbsToNextKey();
             auto value = fmt::format("{}/500", orbs);
-            
+            addStat("Next Key", value, value, { 45, 255, 255 }); 
         }
         if (showDevice) {
             auto value = getDeviceString();
