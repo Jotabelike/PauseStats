@@ -1,6 +1,7 @@
 ﻿#include <Geode/Geode.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/ui/Notification.hpp> // Para la notificación "Copiado"
 #include <Geode/utils/cocos.hpp>
 #include <functional>
 #include <algorithm>
@@ -53,9 +54,13 @@ int getPlatformerCheckpointCount(PlayLayer* playLayer) {
     return count;
 }
 
+// ---NUEVO--- Calcula los orbes para la siguiente llave
+int calculateOrbsToNextKey() {
+    return GameStatsManager::sharedState()->getTotalCollectedCurrency() % 500;
+}
+
 // -------------------- Device string usando Geode --------------------
 std::string getDeviceString() {
-    // GEODE_PLATFORM_NAME ya es un nombre humano (Windows, macOS, Android, iOS, etc.)
     return GEODE_PLATFORM_NAME;
 }
 
@@ -150,9 +155,18 @@ class $modify(PlayLayerHook, PlayLayer) {
 class $modify(PauseLayerHook, PauseLayer) {
     struct Fields {
         std::vector<CCLabelBMFont*> statLabels;
-        std::vector<CCLabelBMFont*> statValues;
-        std::vector<CCLabelBMFont*> idValuesLabels;
+        std::vector<CCNode*> statValues;
+        CCMenu* statMenu = nullptr;
     };
+
+    void onCopy(CCObject * sender) {
+        auto button = static_cast<CCNode*>(sender);
+        auto textToCopy = static_cast<CCString*>(button->getUserObject());
+        if (textToCopy) {
+            utils::clipboard::write(textToCopy->getCString());
+            Notification::create("Copied!", CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png"))->show();
+        }
+    }
 
     void customSetup() override {
         PauseLayer::customSetup();
@@ -161,6 +175,19 @@ class $modify(PauseLayerHook, PauseLayer) {
         if (!playLayer) return;
         auto level = playLayer->m_level;
         if (!level) return;
+
+        if (m_fields->statMenu) {
+            m_fields->statMenu->removeFromParent();
+        }
+        for (auto lbl : m_fields->statLabels) {
+            lbl->removeFromParent();
+        }
+        m_fields->statLabels.clear();
+        m_fields->statValues.clear();
+
+        m_fields->statMenu = CCMenu::create();
+        m_fields->statMenu->setPosition({ 0, 0 });
+        this->addChild(m_fields->statMenu, 101);
 
         float textOpacity = Mod::get()->getSettingValue<float>("text_opacity");
         float statsScale = Mod::get()->getSettingValue<float>("stats_scale");
@@ -178,15 +205,7 @@ class $modify(PauseLayerHook, PauseLayer) {
         bool showLevelID = Mod::get()->getSettingValue<bool>("show_level_id");
         bool showSongID = Mod::get()->getSettingValue<bool>("show_song_id");
         bool showCheckpoints = Mod::get()->getSettingValue<bool>("show_checkpoints");
-
-        // Limpiar labels existentes
-        for (auto lbl : m_fields->statLabels)     if (lbl) lbl->removeFromParent();
-        for (auto lbl : m_fields->statValues)     if (lbl) lbl->removeFromParent();
-        for (auto lbl : m_fields->idValuesLabels) if (lbl) lbl->removeFromParent();
-        m_fields->statLabels.clear();
-        m_fields->statValues.clear();
-        m_fields->idValuesLabels.clear();
-
+        bool showNextKey = Mod::get()->getSettingValue<bool>("show_next_key"); 
         float y = statsY;
         float x = statsX;
         int statIndex = 0;
@@ -197,62 +216,86 @@ class $modify(PauseLayerHook, PauseLayer) {
             return CCPoint{ x, y - index * deltaY * statsScale };
             };
 
-        auto addStat = [&](const std::string& title, const std::string& value,
-            ccColor3B valueColor = { 255,255,255 }, bool idLabel = false) {
-                auto lbl = CCLabelBMFont::create(title.c_str(), "goldFont.fnt");
-                lbl->setScale(0.33f * statsScale);
-                lbl->setColor({ 200,200,200 });
-                lbl->setOpacity(static_cast<GLubyte>(textOpacity * 255));
-                lbl->setPosition(nextPos(statIndex));
-                addChild(lbl, 100);
-                m_fields->statLabels.push_back(lbl);
+        auto addStat = [&](const std::string& title, const std::string& displayValue, const std::string& copyValue,
+            ccColor3B valueColor = { 255, 255, 255 }) {
 
-                auto val = CCLabelBMFont::create(value.c_str(), "bigFont.fnt");
-                val->setScale(0.44f * statsScale);
-                val->setColor(valueColor);
-                val->setOpacity(static_cast<GLubyte>(textOpacity * 255));
+                auto titleLabel = CCLabelBMFont::create(title.c_str(), "goldFont.fnt");
+                titleLabel->setScale(0.33f * statsScale);
+                titleLabel->setColor({ 200, 200, 200 });
+                titleLabel->setOpacity(static_cast<GLubyte>(textOpacity * 255));
+                titleLabel->setPosition(nextPos(statIndex));
+                this->addChild(titleLabel, 100);
+                m_fields->statLabels.push_back(titleLabel);
+
+                auto valueLabel = CCLabelBMFont::create(displayValue.c_str(), "bigFont.fnt");
+                valueLabel->setScale(0.44f * statsScale);
+                valueLabel->setColor(valueColor);
+                valueLabel->setOpacity(static_cast<GLubyte>(textOpacity * 255));
+
+                auto statButton = CCMenuItemSpriteExtra::create(
+                    valueLabel, this, menu_selector(PauseLayerHook::onCopy)
+                );
+
+                statButton->setUserObject(CCString::create(copyValue));
+
                 auto valuePos = nextPos(statIndex);
                 valuePos.y -= 13.0f * statsScale;
-                val->setPosition(valuePos);
-                addChild(val, 100);
-                if (idLabel)
-                    m_fields->idValuesLabels.push_back(val);
-                else
-                    m_fields->statValues.push_back(val);
+                statButton->setPosition(valuePos);
 
-                ++statIndex;
+                m_fields->statMenu->addChild(statButton);
+                m_fields->statValues.push_back(statButton);
+
+                statIndex++;
             };
 
-        if (showAttempts)
-            addStat("Attempts", fmt::format("{}", level->m_attempts));
-        if (showJumps)
-            addStat("Jumps", fmt::format("{}", level->m_jumps));
+        if (showAttempts) {
+            auto value = fmt::format("{}", level->m_attempts);
+            addStat("Attempts", value, value);
+        }
+        if (showJumps) {
+            auto value = fmt::format("{}", level->m_jumps);
+            addStat("Jumps", value, value);
+        }
         if (showCompletions) {
             std::string baseKey = computeLevelStatsKey(level);
             int normal = clampAndFix(baseKey + "_normal", 0);
             int practice = clampAndFix(baseKey + "_practice", 0);
-            addStat("Completed", fmt::format("{} | P:{}", normal, practice));
-            log::info("Pause baseKey={} normal={} practice={} attempts={}", baseKey, normal, practice, level->m_attempts);
+            auto displayValue = fmt::format("{} | P:{}", normal, practice);
+            auto copyValue = fmt::format("Normal: {}, Practice: {}", normal, practice);
+            addStat("Completed", displayValue, copyValue);
         }
         if (showObjectCount) {
-            int objectCount = getObjectCount(level, playLayer);
-            addStat("All Objs", fmt::format("{}", objectCount));
+            auto value = fmt::format("{}", getObjectCount(level, playLayer));
+            addStat("All Objs", value, value);
         }
         if (showCheckpoints) {
             std::string value = "NA";
-            if (playLayer->m_isPlatformer)
+            if (playLayer->m_isPlatformer) {
                 value = fmt::format("{}", getPlatformerCheckpointCount(playLayer));
-            addStat("Checkpoints", value);
+            }
+            addStat("Checkpoints", value, value);
         }
-        if (showDevice)
-            addStat("DEVICE", getDeviceString());
-        if (showGamemode)
-            addStat("Gamemode", playLayer->m_isPlatformer ? "Plat" : "Classic");
-        if (showLevelID)
-            addStat("LEVEL ID", fmt::format("{}", level->m_levelID.value()), { 100,220,255 }, true);
+        // ---NUEVO--- Añadir la estadística "Next Key"
+        if (showNextKey) {
+            auto orbs = calculateOrbsToNextKey();
+            auto value = fmt::format("{}/500", orbs);
+            
+        }
+        if (showDevice) {
+            auto value = getDeviceString();
+            addStat("DEVICE", value, value);
+        }
+        if (showGamemode) {
+            auto value = playLayer->m_isPlatformer ? "Plat" : "Classic";
+            addStat("Gamemode", value, value);
+        }
+        if (showLevelID) {
+            auto value = fmt::format("{}", level->m_levelID.value());
+            addStat("LEVEL ID", value, value, { 100, 220, 255 });
+        }
         if (showSongID) {
-            std::string songID = level->m_songID ? fmt::format("{}", level->m_songID) : "0";
-            addStat("SONG ID", songID, { 100,220,255 }, true);
+            std::string value = level->m_songID ? fmt::format("{}", level->m_songID) : "0";
+            addStat("SONG ID", value, value, { 100, 220, 255 });
         }
     }
 
@@ -261,8 +304,6 @@ class $modify(PauseLayerHook, PauseLayer) {
         float deltaY = getDeltaY();
         bool horizontal = isHorizontal();
         float x = newX, y = newY;
-        int statIndex = 0;
-        int valueIndex = 0;
 
         auto nextPos = [&](int index) {
             if (horizontal)
@@ -270,26 +311,16 @@ class $modify(PauseLayerHook, PauseLayer) {
             return CCPoint{ x, y - index * deltaY * statsScale };
             };
 
-        for (; statIndex < static_cast<int>(m_fields->statLabels.size()); ++statIndex) {
-            if (m_fields->statLabels[statIndex])
-                m_fields->statLabels[statIndex]->setPosition(nextPos(statIndex));
-
-            if (valueIndex < static_cast<int>(m_fields->statValues.size()) &&
-                m_fields->statValues[valueIndex]) {
-                auto valuePos = nextPos(statIndex);
-                valuePos.y -= 13.0f * statsScale;
-                m_fields->statValues[valueIndex++]->setPosition(valuePos);
+        for (size_t i = 0; i < m_fields->statLabels.size(); ++i) {
+            if (m_fields->statLabels[i]) {
+                m_fields->statLabels[i]->setPosition(nextPos(i));
             }
-        }
 
-        int idIndex = 0;
-        for (auto lbl : m_fields->idValuesLabels) {
-            if (lbl) {
-                auto valuePos = nextPos(statIndex + idIndex);
+            if (i < m_fields->statValues.size() && m_fields->statValues[i]) {
+                auto valuePos = nextPos(i);
                 valuePos.y -= 13.0f * statsScale;
-                lbl->setPosition(valuePos);
+                m_fields->statValues[i]->setPosition(valuePos);
             }
-            idIndex++;
         }
     }
 };

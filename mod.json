@@ -1,5 +1,5 @@
 {
-	"geode": "4.7.0",
+	"geode": "4.9.0",
 	"gd": {
 		"win": "2.2074",
 		"android": "2.2074",
@@ -8,9 +8,9 @@
 	},
 	"id": "jotabelike.pausestats",
 	"name": "Pause Stats",
-	"version": "v1.2.8",
+	"version": "v1.3.0",
 	"developer": "XJotabelikeX",
-	"description": "More stats in pause menu. Ahora muestra cuántos checkpoints tiene el nivel en modo plataforma.",
+	"description": "Simple and accessible information interface!",
 	"tags": [
 		"interface",
 		"utility",
@@ -24,35 +24,6 @@
 			"type": "bool",
 			"default": true,
 			"name": "Show Attempts"
-		},
-		"stats_x": {
-			"type": "float",
-			"default": 42.0,
-			"min": 0.0,
-			"max": 800.0,
-			"name": "X Position",
-			"control": { "slider": true }
-		},
-		"stats_y": {
-			"type": "float",
-			"default": 290.0,
-			"min": 0.0,
-			"max": 600.0,
-			"name": "Y Position",
-			"control": { "slider": true }
-		},
-		"stats_spacing": {
-			"type": "float",
-			"default": 31.0,
-			"min": 10.0,
-			"max": 80.0,
-			"name": "Stats Spacing",
-			"control": { "slider": true }
-		},
-		"stats_horizontal": {
-			"type": "bool",
-			"default": false,
-			"name": "Horizontal Layout"
 		},
 		"show_jumps": {
 			"type": "bool",
@@ -76,6 +47,22 @@
 			"name": "Show Checkpoints",
 			"info": "Muestra cuántos checkpoints tiene el nivel (solo en modo plataforma)."
 		},
+		"show_next_key": {
+			"type": "bool",
+			"default": true,
+			"name": "Show Next Key Progress",
+			"info": "Muestra cuántos orbes faltan para la siguiente llave (de 500)."
+		},
+		"show_device": {
+			"type": "bool",
+			"default": true,
+			"name": "Show Device"
+		},
+		"show_gamemode": {
+			"type": "bool",
+			"default": true,
+			"name": "Show Gamemode"
+		},
 		"show_level_id": {
 			"type": "bool",
 			"default": true,
@@ -86,31 +73,60 @@
 			"default": true,
 			"name": "Show Song ID"
 		},
-		"show_gamemode": {
+		"stats_horizontal": {
 			"type": "bool",
-			"default": true,
-			"name": "Show Gamemode"
+			"default": false,
+			"name": "Horizontal Layout"
 		},
-		"show_device": {
-			"type": "bool",
-			"default": true,
-			"name": "Show Device"
-		},
-		"text_opacity": {
+		"stats_x": {
 			"type": "float",
-			"default": 1.0,
-			"min": 0.1,
-			"max": 1.0,
-			"name": "Text Opacity",
-			"control": { "slider": true }
+			"default": 42,
+			"min": 0,
+			"max": 800,
+			"name": "X Position",
+			"control": {
+				"slider": true
+			}
+		},
+		"stats_y": {
+			"type": "float",
+			"default": 290,
+			"min": 0,
+			"max": 600,
+			"name": "Y Position",
+			"control": {
+				"slider": true
+			}
+		},
+		"stats_spacing": {
+			"type": "float",
+			"default": 31,
+			"min": 10,
+			"max": 80,
+			"name": "Stats Spacing",
+			"control": {
+				"slider": true
+			}
 		},
 		"stats_scale": {
 			"type": "float",
 			"default": 0.7,
 			"min": 0.5,
-			"max": 2.0,
+			"max": 2,
 			"name": "Stats Size",
-			"control": { "slider": true }
+			"control": {
+				"slider": true
+			}
+		},
+		"text_opacity": {
+			"type": "float",
+			"default": 1,
+			"min": 0.1,
+			"max": 1,
+			"name": "Text Opacity",
+			"control": {
+				"slider": true
+			}
 		}
 	}
 }

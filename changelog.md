@@ -1,6 +1,9 @@
-# Changelog Pause Stats
+# Pause Stats
+## v1.3.0 Copy information
+- The option was added to copy the information of each information individually
+- Next Key
 
-
+---
 
 ## v1.2.8 – Bugfix & Device Update
 - Fixed the completion counter sometimes staying at 35 after playing a copied level.
